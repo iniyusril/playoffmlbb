@@ -6,7 +6,7 @@ services:
       target: runtime
     container_name: playoff-mlbb
     ports:
-      - "8000:8000"
+      - "9009:8000"
     environment:
       - PYTHONUNBUFFERED=1
     restart: unless-stopped
