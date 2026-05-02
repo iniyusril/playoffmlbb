@@ -6,14 +6,14 @@ services:
       target: runtime
     container_name: playoff-mlbb
     ports:
-      - "9009:8000"
+      - "9009:9009"
     environment:
       - PYTHONUNBUFFERED=1
     restart: unless-stopped
     # Playwright Chromium membutuhkan shared memory yang cukup
     shm_size: "256mb"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/data"]
+      test: ["CMD", "curl", "-f", "http://localhost:9009/api/data"]
       interval: 5m
       timeout: 30s
       retries: 3
