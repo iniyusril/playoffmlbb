@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MPL ID S17 — Peluang Playoff</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* ── Custom scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0d1117; }
+    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+
+    /* ── Gradient probability bar ── */
+    .prob-bar-inner {
+      transition: width 0.8s ease;
+    }
+
+    /* ── Glow animation saat update ── */
+    @keyframes fadeInRow {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .row-animate { animation: fadeInRow 0.4s ease forwards; }
+
+    /* ── Pulse loading ── */
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .loading-pulse { animation: pulse 1.2s infinite; }
+
+    /* ── Separator line playoff ── */
+    .playoff-cutline td {
+      border-bottom: 2px dashed #22c55e !important;
+      padding-bottom: 4px;
+    }
+  </style>
+</head>
+<body class="bg-[#0d1117] text-gray-100 min-h-screen font-sans antialiased">
+
+  <!-- ══ HEADER ══════════════════════════════════════════════════════════════ -->
+  <header class="bg-[#161b22] border-b border-[#30363d] shadow-lg">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <img
+          src="https://id-mpl.com/images/s14/logo/WITH%20LOGO%20MPL%201.webp"
+          alt="MPL ID"
+          class="h-10 object-contain"
+          onerror="this.style.display='none'"
+        />
+        <div>
+          <h1 class="text-xl font-bold text-white leading-tight">Peluang Playoff</h1>
+          <p class="text-xs text-gray-400">MPL Indonesia Season 17 · Regular Season</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <!-- Last updated -->
+        <div class="text-right hidden sm:block">
+          <p class="text-xs text-gray-500">Terakhir diperbarui</p>
+          <p id="lastUpdated" class="text-xs text-gray-300 font-mono">—</p>
+        </div>
+        <!-- Refresh button -->
+        <button
+          id="refreshBtn"
+          onclick="forceRefresh()"
+          class="flex items-center gap-1.5 bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-gray-300 text-sm px-3 py-1.5 rounded-lg transition"
+          title="Paksa refresh data"
+        >
+          <svg id="refreshIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          <span class="hidden sm:inline">Refresh</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ══ LEGEND ══════════════════════════════════════════════════════════════ -->
+  <div class="max-w-6xl mx-auto px-4 pt-4">
+    <div class="flex flex-wrap gap-3 text-xs text-gray-400">
+      <div class="flex items-center gap-1.5">
+        <span class="inline-block w-3 h-3 rounded-full bg-green-500"></span>
+        Top 6 lolos playoff
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="inline-block w-2 h-2 rounded-full bg-green-400"></span>
+        <span class="bg-green-900/40 text-green-300 border border-green-700 text-[10px] px-1.5 py-0.5 rounded-full font-semibold">PASTI LOLOS</span>
+        Secara matematis sudah pasti lolos
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="bg-red-900/40 text-red-300 border border-red-700 text-[10px] px-1.5 py-0.5 rounded-full font-semibold">ELIMINASI</span>
+        Secara matematis sudah tidak bisa lolos
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ MAIN CONTENT ════════════════════════════════════════════════════════ -->
+  <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+
+    <!-- Loading state -->
+    <div id="loadingState" class="loading-pulse text-center py-20 text-gray-500">
+      <svg class="w-10 h-10 mx-auto mb-3 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor"
+          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+      </svg>
+      Mengambil data terkini dari id-mpl.com...
+    </div>
+
+    <!-- Error state -->
+    <div id="errorState" class="hidden text-center py-12">
+      <p class="text-red-400 text-lg font-semibold mb-2">Gagal memuat data</p>
+      <p id="errorMsg" class="text-gray-500 text-sm mb-4"></p>
+      <button onclick="fetchData()" class="bg-red-800 hover:bg-red-700 text-white text-sm px-4 py-2 rounded-lg transition">
+        Coba lagi
+      </button>
+    </div>
+
+    <!-- Data content -->
+    <div id="dataContent" class="hidden space-y-6">
+
+      <!-- ── Standings Table ─────────────────────────────────────────────── -->
+      <section class="bg-[#161b22] border border-[#30363d] rounded-xl overflow-hidden">
+        <div class="px-5 py-3 border-b border-[#30363d] flex items-center justify-between">
+          <h2 class="font-semibold text-gray-100">Klasemen Regular Season</h2>
+          <span id="remainingBadge" class="text-xs bg-blue-900/50 text-blue-300 border border-blue-800 px-2 py-0.5 rounded-full"></span>
+        </div>
+
+        <!-- Desktop table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-[11px] text-gray-500 uppercase tracking-wider border-b border-[#30363d]">
+                <th class="px-4 py-2.5 text-left w-8">#</th>
+                <th class="px-4 py-2.5 text-left">Tim</th>
+                <th class="px-4 py-2.5 text-center">MP</th>
+                <th class="px-4 py-2.5 text-center">M W-L</th>
+                <th class="px-4 py-2.5 text-center hidden sm:table-cell">Net GW</th>
+                <th class="px-4 py-2.5 text-center hidden md:table-cell">Game W-L</th>
+                <th class="px-4 py-2.5 text-left pl-6">% Playoff</th>
+              </tr>
+            </thead>
+            <tbody id="standingsBody">
+              <!-- Diisi oleh JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── Two-column: Remaining Matches + Status Cards ───────────────── -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- Remaining Matches -->
+        <section class="bg-[#161b22] border border-[#30363d] rounded-xl overflow-hidden">
+          <div class="px-5 py-3 border-b border-[#30363d]">
+            <h2 class="font-semibold text-gray-100">Pertandingan Tersisa</h2>
+            <p class="text-xs text-gray-500 mt-0.5">Semua match yang belum dimainkan</p>
+          </div>
+          <ul id="matchList" class="divide-y divide-[#21262d] max-h-96 overflow-y-auto">
+            <!-- Diisi oleh JavaScript -->
+          </ul>
+        </section>
+
+        <!-- Status Summary -->
+        <section class="bg-[#161b22] border border-[#30363d] rounded-xl overflow-hidden">
+          <div class="px-5 py-3 border-b border-[#30363d]">
+            <h2 class="font-semibold text-gray-100">Ringkasan Status</h2>
+            <p class="text-xs text-gray-500 mt-0.5">Berdasarkan simulasi Monte Carlo 10.000 iterasi</p>
+          </div>
+          <div id="statusCards" class="p-4 space-y-2">
+            <!-- Diisi oleh JavaScript -->
+          </div>
+        </section>
+
+      </div>
+
+      <!-- ── Methodology note ───────────────────────────────────────────── -->
+      <p class="text-xs text-gray-600 text-center pb-2">
+        Persentase dihitung dengan Monte Carlo Simulation (10.000 iterasi) dengan asumsi peluang menang 50/50 per pertandingan.
+        Tiebreaker: Match Points → Net Game Win → Game Win Rate.
+        Data otomatis diperbarui setiap 30 menit dari
+        <a href="https://id-mpl.com" target="_blank" class="text-blue-500 hover:underline">id-mpl.com</a>.
+      </p>
+
+    </div><!-- /dataContent -->
+  </main>
+
+  <!-- ══ JAVASCRIPT ══════════════════════════════════════════════════════════ -->
+  <script>
+    // ── Konstanta warna tim ──────────────────────────────────────────────────
+    const TEAM_COLORS = {
+      ONIC: '#E8871A', DEWA: '#8B0000', BTR: '#E63946',
+      AE:   '#00B4D8', EVOS: '#FF0000', TLID: '#009EBD',
+      GEEK: '#9B59B6', NAVI: '#F1C40F', RRQ:  '#CC0033',
+    };
+
+    // ── Auto-refresh setiap 5 menit ──────────────────────────────────────────
+    let autoRefreshTimer = null;
+
+    function scheduleAutoRefresh() {
+      clearInterval(autoRefreshTimer);
+      autoRefreshTimer = setInterval(fetchData, 30 * 60 * 1000);
+    }
+
+    // ── Fetch data dari API ──────────────────────────────────────────────────
+    async function fetchData() {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/data');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        renderAll(data);
+        showContent();
+      } catch (err) {
+        showError(err.message || 'Tidak dapat terhubung ke server.');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function forceRefresh() {
+      const btn = document.getElementById('refreshBtn');
+      const icon = document.getElementById('refreshIcon');
+      btn.disabled = true;
+      icon.classList.add('animate-spin');
+      try {
+        await fetch('/api/refresh', { method: 'POST' });
+        await fetchData();
+      } finally {
+        btn.disabled = false;
+        icon.classList.remove('animate-spin');
+      }
+    }
+
+    // ── Render seluruh UI ────────────────────────────────────────────────────
+    function renderAll(data) {
+      renderStandings(data.standings);
+      renderMatches(data.remaining_matches);
+      renderStatusCards(data.standings);
+      updateMeta(data);
+    }
+
+    // ── Standings table ──────────────────────────────────────────────────────
+    function renderStandings(standings) {
+      const tbody = document.getElementById('standingsBody');
+      tbody.innerHTML = '';
+
+      standings.forEach((team, idx) => {
+        const isPlayoffLine = (idx === 5 && standings.length > 6); // setelah rank 6
+        const tr = document.createElement('tr');
+        tr.className = 'border-b border-[#21262d] hover:bg-[#1c2128] transition row-animate';
+        if (idx < 6) tr.classList.add('bg-green-950/10');
+
+        const prob         = team.playoff_prob;
+        const barColor     = probColor(prob);
+        const statusBadge  = badgeHtml(team.status);
+        const rankIndicator = idx < 6
+          ? `<span class="inline-block w-2 h-2 rounded-full bg-green-500 mr-1"></span>`
+          : `<span class="inline-block w-2 h-2 rounded-full bg-gray-700 mr-1"></span>`;
+
+        tr.innerHTML = `
+          <td class="px-4 py-3 text-gray-400 w-8 font-mono text-xs">${rankIndicator}${team.rank}</td>
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-2.5">
+              ${logoHtml(team)}
+              <div>
+                <div class="font-semibold text-gray-100 text-sm">${team.name}</div>
+                ${statusBadge}
+              </div>
+            </div>
+          </td>
+          <td class="px-4 py-3 text-center font-bold text-white">${team.match_points}</td>
+          <td class="px-4 py-3 text-center">
+            <span class="text-green-400">${team.wins}</span>
+            <span class="text-gray-600">/</span>
+            <span class="text-red-400">${team.losses}</span>
+          </td>
+          <td class="px-4 py-3 text-center hidden sm:table-cell ${team.net_game_win >= 0 ? 'text-green-400' : 'text-red-400'}">
+            ${team.net_game_win > 0 ? '+' : ''}${team.net_game_win}
+          </td>
+          <td class="px-4 py-3 text-center hidden md:table-cell text-gray-400">
+            ${team.game_wins}-${team.game_losses}
+          </td>
+          <td class="px-4 py-3 pl-6 min-w-[180px]">
+            <div class="flex items-center gap-2">
+              <div class="flex-1 bg-[#21262d] rounded-full h-2.5 overflow-hidden">
+                <div class="prob-bar-inner h-2.5 rounded-full ${barColor}" style="width: ${prob}%"></div>
+              </div>
+              <span class="text-xs font-mono w-12 text-right ${probTextColor(prob)}">${prob.toFixed(1)}%</span>
+            </div>
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+
+        // Garis pemisah playoff setelah rank 6
+        if (isPlayoffLine) {
+          const dividerRow = document.createElement('tr');
+          dividerRow.innerHTML = `
+            <td colspan="7" class="px-4 py-1">
+              <div class="flex items-center gap-2">
+                <div class="flex-1 border-t border-dashed border-green-700/50"></div>
+                <span class="text-[10px] text-green-700 font-semibold whitespace-nowrap">--- BATAS PLAYOFF ---</span>
+                <div class="flex-1 border-t border-dashed border-green-700/50"></div>
+              </div>
+            </td>`;
+          tbody.appendChild(dividerRow);
+        }
+      });
+    }
+
+    // ── Remaining matches list ───────────────────────────────────────────────
+    function renderMatches(matches) {
+      const ul = document.getElementById('matchList');
+      if (!matches || matches.length === 0) {
+        ul.innerHTML = `<li class="px-5 py-8 text-center text-gray-500 text-sm">
+          Tidak ada pertandingan tersisa — Regular Season selesai.
+        </li>`;
+        return;
+      }
+
+      ul.innerHTML = matches.map(([t1, t2], i) => `
+        <li class="flex items-center justify-between px-5 py-2.5 hover:bg-[#1c2128] transition">
+          <div class="flex items-center gap-2 flex-1 justify-end">
+            <span class="font-semibold text-sm text-gray-200">${t1}</span>
+            <div class="w-5 h-5 rounded-full flex-shrink-0" style="background:${TEAM_COLORS[t1]||'#555'}"></div>
+          </div>
+          <span class="mx-3 text-[11px] font-bold text-gray-500 w-6 text-center">VS</span>
+          <div class="flex items-center gap-2 flex-1">
+            <div class="w-5 h-5 rounded-full flex-shrink-0" style="background:${TEAM_COLORS[t2]||'#555'}"></div>
+            <span class="font-semibold text-sm text-gray-200">${t2}</span>
+          </div>
+        </li>`
+      ).join('');
+    }
+
+    // ── Status cards ─────────────────────────────────────────────────────────
+    function renderStatusCards(standings) {
+      const container = document.getElementById('statusCards');
+      container.innerHTML = standings.map(team => {
+        const prob = team.playoff_prob;
+        const bar  = probColor(prob);
+        const statusLabel = {
+          PASTI_LOLOS: '<span class="text-green-300 font-bold">✓ Pasti Lolos</span>',
+          ELIMINASI:   '<span class="text-red-400 font-bold">✗ Eliminasi</span>',
+          BERSAING:    `<span class="text-yellow-300 font-bold">${prob.toFixed(1)}% peluang</span>`,
+        }[team.status] || '';
+
+        const rankRange = team.best_rank === team.worst_rank
+          ? `rank ${team.best_rank}`
+          : `rank ${team.best_rank}–${team.worst_rank}`;
+
+        return `
+          <div class="flex items-center gap-3 ${team.rank <= 6 ? 'opacity-100':'opacity-75'}">
+            ${logoHtml(team, 24)}
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-sm font-semibold text-gray-200">${team.name}</span>
+                <span class="text-xs text-right">${statusLabel}</span>
+              </div>
+              <div class="flex items-center gap-2 mt-1">
+                <div class="flex-1 bg-[#21262d] rounded-full h-1.5">
+                  <div class="h-1.5 rounded-full ${bar}" style="width:${prob}%"></div>
+                </div>
+                <span class="text-[10px] text-gray-600 whitespace-nowrap">${rankRange}</span>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    // ── Meta info ────────────────────────────────────────────────────────────
+    function updateMeta(data) {
+      document.getElementById('remainingBadge').textContent =
+        `${data.total_remaining} match tersisa`;
+
+      const ts = new Date(data.last_updated * 1000);
+      document.getElementById('lastUpdated').textContent =
+        ts.toLocaleString('id-ID', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+    }
+
+    // ── UI helpers ───────────────────────────────────────────────────────────
+    function logoHtml(team, size = 28) {
+      const sz = size;
+      return `
+        <div class="relative flex-shrink-0" style="width:${sz}px;height:${sz}px">
+          <img src="${team.logo}" alt="${team.name}"
+            class="w-full h-full rounded-full object-contain"
+            onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"
+          />
+          <div class="absolute inset-0 rounded-full items-center justify-center text-white text-[10px] font-bold"
+            style="background:${team.color};display:none;">
+            ${team.name.slice(0,2)}
+          </div>
+        </div>`;
+    }
+
+    function badgeHtml(status) {
+      if (status === 'PASTI_LOLOS') {
+        return `<span class="text-[9px] font-bold bg-green-900/50 text-green-300 border border-green-700/60 px-1.5 py-0.5 rounded-full">PASTI LOLOS</span>`;
+      }
+      if (status === 'ELIMINASI') {
+        return `<span class="text-[9px] font-bold bg-red-900/50 text-red-300 border border-red-700/60 px-1.5 py-0.5 rounded-full">ELIMINASI</span>`;
+      }
+      return '';
+    }
+
+    function probColor(prob) {
+      if (prob >= 75) return 'bg-green-500';
+      if (prob >= 45) return 'bg-yellow-400';
+      if (prob >= 15) return 'bg-orange-500';
+      return 'bg-red-600';
+    }
+
+    function probTextColor(prob) {
+      if (prob >= 75) return 'text-green-400';
+      if (prob >= 45) return 'text-yellow-400';
+      if (prob >= 15) return 'text-orange-400';
+      return 'text-red-400';
+    }
+
+    function setLoading(val) {
+      document.getElementById('loadingState').classList.toggle('hidden', !val);
+      document.getElementById('refreshBtn').disabled = val;
+    }
+
+    function showContent() {
+      document.getElementById('loadingState').classList.add('hidden');
+      document.getElementById('errorState').classList.add('hidden');
+      document.getElementById('dataContent').classList.remove('hidden');
+    }
+
+    function showError(msg) {
+      document.getElementById('loadingState').classList.add('hidden');
+      document.getElementById('dataContent').classList.add('hidden');
+      document.getElementById('errorState').classList.remove('hidden');
+      document.getElementById('errorMsg').textContent = msg;
+    }
+
+    // ── Init ─────────────────────────────────────────────────────────────────
+    fetchData();
+    scheduleAutoRefresh();
+  </script>
+
+</body>
+</html>

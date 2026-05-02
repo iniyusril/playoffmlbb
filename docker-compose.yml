@@ -1,0 +1,20 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: playoff-mlbb
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    # Playwright Chromium membutuhkan shared memory yang cukup
+    shm_size: "256mb"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/data"]
+      interval: 5m
+      timeout: 30s
+      retries: 3
+      start_period: 60s
