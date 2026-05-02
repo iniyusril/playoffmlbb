@@ -1,5 +1,5 @@
 # ── Stage 1: base image dengan Playwright Chromium ──────────────────────────
-FROM mcr.microsoft.com/playwright/python:v1.43.0-jammy AS base
+FROM mcr.microsoft.com/playwright/python:v1.59.0-jammy AS base
 
 WORKDIR /app
 
