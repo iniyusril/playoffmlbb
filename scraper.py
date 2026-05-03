@@ -1,5 +1,5 @@
 """
-Scraper untuk id-mpl.com menggunakan Playwright (headless Chromium).
+Scraper untuk Liquipedia MPL ID S17 menggunakan Playwright (headless Chromium).
 Mengambil standings dan jadwal pertandingan yang belum dimainkan.
 """
 
@@ -9,7 +9,24 @@ from playwright.async_api import async_playwright
 
 logger = logging.getLogger(__name__)
 
+LIQUIPEDIA_URL = (
+    "https://liquipedia.net/mobilelegends/MPL/Indonesia/Season_17/Regular_Season"
+)
+
 TEAM_CODES = ["ONIC", "DEWA", "BTR", "AE", "EVOS", "TLID", "GEEK", "NAVI", "RRQ"]
+
+# Nama lengkap di Liquipedia → kode pendek yang dipakai simulator
+TEAM_NAME_MAP = {
+    "ONIC":                    "ONIC",
+    "EVOS":                    "EVOS",
+    "Dewa United Esports":     "DEWA",
+    "Bigetron by Vitality":    "BTR",
+    "Team Liquid ID":          "TLID",
+    "Alter Ego":               "AE",
+    "Geek Fam ID":             "GEEK",
+    "Natus Vincere":           "NAVI",
+    "RRQ Hoshi":               "RRQ",
+}
 
 TEAM_LOGOS = {
     "ONIC": "https://wsrv.nl/?url=https://ik.imagekit.io/nloe8dhf7w/mplid/s14/teams/onic-64.png",
@@ -38,10 +55,10 @@ TEAM_COLORS = {
 
 async def scrape_data() -> dict:
     """
-    Scrape standings dan remaining matches dari id-mpl.com.
+    Scrape standings dan remaining matches dari Liquipedia MPL ID S17.
     Returns dict: { standings: dict, remaining_matches: list[tuple] }
     """
-    logger.info("Memulai scraping id-mpl.com ...")
+    logger.info("Memulai scraping Liquipedia MPL ID S17 ...")
 
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=True)
@@ -54,109 +71,37 @@ async def scrape_data() -> dict:
             viewport={"width": 1280, "height": 800},
         )
         page = await context.new_page()
-        page.set_default_timeout(30_000)
+        page.set_default_timeout(45_000)
 
-        # ── 1. Standings dari halaman utama ──────────────────────────────
-        await page.goto("https://id-mpl.com/", wait_until="domcontentloaded")
+        await page.goto(LIQUIPEDIA_URL, wait_until="networkidle")
+        # Tunggu konten dinamis ter-render
+        await page.wait_for_timeout(4_000)
 
-        # Tunggu sampai data standings muncul (RRQ adalah tim terakhir di tabel)
-        try:
-            await page.wait_for_function(
-                "() => document.body.textContent.includes('RRQ')",
-                timeout=15_000,
-            )
-        except Exception:
-            logger.warning("Timeout menunggu standings penuh, lanjut dengan konten tersedia.")
-
-        # Scroll ke bawah supaya lazy-loaded content ter-render
-        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-        await page.wait_for_timeout(1_500)
-
-        # Gunakan textContent (bukan innerText) agar element tersembunyi ikut terbaca
-        home_text: str = await page.evaluate("() => document.body.textContent")
-        logger.info("Home page fetched, panjang text: %d", len(home_text))
-
-        standings = parse_standings(home_text)
-        logger.info("Standings ditemukan: %s", list(standings.keys()))
-
-        # ── 2. Schedule dari halaman jadwal ──────────────────────────────
-        await page.goto("https://id-mpl.com/schedule", wait_until="domcontentloaded")
-
-        # Tunggu match cards muncul di DOM
-        try:
-            await page.wait_for_selector(".match.position-relative", timeout=15_000)
-        except Exception:
-            logger.warning("Match elements tidak ditemukan, lanjut.")
-
-        await page.wait_for_timeout(1_500)
-
-        # Ekstrak langsung dari DOM — lebih andal daripada textContent parsing.
-        # Halaman menampilkan match yang sama di beberapa filter-view (per tim),
-        # sehingga deduplication via sorted key wajib.
-        remaining = await _dom_extract_remaining_matches(page)
-        logger.info("Remaining matches dari DOM: %d pertandingan", len(remaining))
+        text: str = await page.evaluate("() => document.body.innerText")
+        logger.info("Liquipedia page fetched, panjang text: %d", len(text))
 
         await browser.close()
 
-    # Fallback: tambah match yang diketahui jika DOM extraction kurang lengkap
-    fallback_list = _fallback_remaining_matches()
-    seen = {frozenset(m) for m in remaining}
-    for m in fallback_list:
-        if frozenset(m) not in seen:
-            remaining.append(m)
-            seen.add(frozenset(m))
+    standings = parse_standings(text)
+    logger.info("Standings ditemukan: %s", list(standings.keys()))
 
-    logger.info("Total remaining matches setelah merge fallback: %d", len(remaining))
+    remaining = parse_remaining_matches(text)
+    logger.info("Remaining matches: %d pertandingan", len(remaining))
+
+    # Fallback: isi tim/match yang gagal di-parse
+    fallback_st = _fallback_standings()
+    for team in fallback_st:
+        if team not in standings:
+            logger.warning("Tim %s tidak ditemukan, menggunakan fallback.", team)
+            standings[team] = fallback_st[team]
+
+    if len(remaining) < 5:
+        logger.warning(
+            "Remaining matches terlalu sedikit (%d), menggunakan fallback.", len(remaining)
+        )
+        remaining = _fallback_remaining_matches()
+
     return {"standings": standings, "remaining_matches": remaining}
-
-
-async def _dom_extract_remaining_matches(page) -> list:
-    """
-    Ekstrak pertandingan yang belum dimainkan langsung dari DOM
-    menggunakan selector .match.position-relative.
-
-    Setiap pertandingan ditampilkan di beberapa konteks filter (per tim),
-    sehingga deduplikasi via sorted-pair key wajib.
-    """
-    _JS = """
-() => {
-    var VALID_TEAMS = ["ONIC","DEWA","BTR","AE","EVOS","TLID","GEEK","NAVI","RRQ"];
-    var seen = {};
-    var results = [];
-    var matchEls = document.querySelectorAll('.match.position-relative');
-
-    for (var i = 0; i < matchEls.length; i++) {
-        var el = matchEls[i];
-
-        var teamEls = el.querySelectorAll('.match-team');
-        var teams = [];
-        for (var j = 0; j < teamEls.length; j++) {
-            var t = teamEls[j].textContent.trim();
-            if (VALID_TEAMS.indexOf(t) !== -1) teams.push(t);
-        }
-        if (teams.length !== 2) continue;
-
-        var hasReplay = !!el.querySelector('a[href*="youtube"]') ||
-                        !!el.querySelector('[class*="replay"]') ||
-                        el.textContent.toLowerCase().indexOf('details') !== -1;
-        if (hasReplay) continue;
-
-        var key = [teams[0], teams[1]].sort().join('|');
-        if (seen[key]) continue;
-        seen[key] = true;
-
-        results.push([teams[0], teams[1]]);
-    }
-    return results;
-}
-"""
-    try:
-        raw = await page.evaluate(_JS)
-        valid = set(TEAM_CODES)
-        return [(t1, t2) for t1, t2 in raw if t1 in valid and t2 in valid]
-    except Exception as exc:
-        logger.error("DOM extraction gagal: %s", exc)
-        return []
 
 
 
@@ -164,31 +109,51 @@ async def _dom_extract_remaining_matches(page) -> list:
 
 def parse_standings(text: str) -> dict:
     """
-    Membaca teks halaman utama dan mengekstrak tabel standings.
-    Format baris: TEAM MP MW-ML NGW GW-GL
-    Contoh: ONIC 8 8 - 2 13 18 - 5
+    Parse standings dari Liquipedia innerText.
+    Format baris: N.  TEAM_NAME  W-L  GW-GL  +/-DIFF
+    TEAM_NAME bisa berisi spasi (misal: "Dewa United Esports").
     """
-    team_alt = "|".join(TEAM_CODES)
-    # Match: TEAM  match_pts  match_w - match_l  net_game_win  game_w - game_l
+    standings: dict = {}
+
+    # Cari batas section standings (antara "Regular Season[edit]" dan H2H/tiebreaker)
+    start = text.find("Regular Season[edit]")
+    if start != -1:
+        start += len("Regular Season[edit]")
+    else:
+        start = text.find("# Team")
+        if start == -1:
+            start = 0
+
+    end = len(text)
+    for marker in ("Tiebreakers:", "Show Individual", "Detailed Results"):
+        pos = text.find(marker, start)
+        if pos != -1 and pos < end:
+            end = pos
+
+    section = text[start:end]
+
+    # Pattern: "N.  TEAM_NAME  W-L  GW-GL  +/-DIFF"
     pattern = re.compile(
-        rf"(?<!\w)({team_alt})\s+(\d+)\s+(\d+)\s*[-–]\s*(\d+)\s+(-?\d+)\s+(\d+)\s*[-–]\s*(\d+)"
+        r"\d+\.\s+(.+?)\s+(\d+)-(\d+)\s+(\d+)-(\d+)\s+([+-]?\d+)",
+        re.MULTILINE,
     )
 
-    standings: dict = {}
-    for m in pattern.finditer(text):
-        team = m.group(1)
-        if team in standings:        # ambil entri pertama (deduplication)
+    for m in pattern.finditer(section):
+        raw_name = re.sub(r"\s+", " ", m.group(1)).strip()
+        team_code = TEAM_NAME_MAP.get(raw_name)
+        if not team_code or team_code in standings:
             continue
-        standings[team] = {
-            "name":          team,
-            "match_points":  int(m.group(2)),   # sama dengan wins
-            "wins":          int(m.group(3)),
-            "losses":        int(m.group(4)),
-            "net_game_win":  int(m.group(5)),
-            "game_wins":     int(m.group(6)),
-            "game_losses":   int(m.group(7)),
-            "logo":          TEAM_LOGOS.get(team, ""),
-            "color":         TEAM_COLORS.get(team, "#888"),
+
+        standings[team_code] = {
+            "name":         team_code,
+            "match_points": int(m.group(2)),
+            "wins":         int(m.group(2)),
+            "losses":       int(m.group(3)),
+            "net_game_win": int(m.group(6)),
+            "game_wins":    int(m.group(4)),
+            "game_losses":  int(m.group(5)),
+            "logo":         TEAM_LOGOS.get(team_code, ""),
+            "color":        TEAM_COLORS.get(team_code, "#888"),
         }
 
     # Fallback: isi tim yang tidak ditemukan dengan data hardcoded
@@ -200,19 +165,93 @@ def parse_standings(text: str) -> dict:
 
     return standings
 
+
+# ── Parser Jadwal Tersisa ─────────────────────────────────────────────────────
+
+def parse_remaining_matches(text: str) -> list:
+    """
+    Parse sisa pertandingan dari weekly schedule Liquipedia.
+
+    Format completed : TEAM1 \\n SCORE1 \\n SCORE2 \\n TEAM2   (score > 0)
+    Format upcoming  : TEAM1 \\n TEAM2                         (tanpa skor)
+    Format 0-0 / live: TEAM1 \\n 0 \\n 0 \\n TEAM2             (dianggap tersisa)
+
+    Di Liquipedia, setiap pertandingan hanya muncul sekali sehingga
+    deduplication tidak dibutuhkan.
+    """
+    VALID = set(TEAM_CODES)
+
+    # Mulai dari weekly schedule (setelah H2H / "Show Individual")
+    anchor = text.find("Show Individual")
+    if anchor == -1:
+        anchor = text.find("Tiebreakers:")
+    search_from = anchor if anchor != -1 else 0
+
+    # Cari "Week 1" pertama dalam section schedule (bukan di TOC)
+    week1_pos = text.find("Week 1", search_from)
+    if week1_pos == -1:
+        return []
+
+    # Cari akhir section sebelum footer
+    end = len(text)
+    for marker in ("Send an email", "Privacy policy", "About Liquipedia"):
+        pos = text.find(marker, week1_pos)
+        if pos != -1 and pos < end:
+            end = pos
+
+    section = text[week1_pos:end]
+    lines = [l.strip() for l in section.split("\n") if l.strip()]
+
+    remaining = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if line not in VALID:
+            i += 1
+            continue
+
+        team1 = line
+        if i + 1 >= len(lines):
+            break
+
+        next1 = lines[i + 1]
+
+        if next1 in VALID:
+            # Format upcoming: langsung diikuti tim kedua (tanpa skor)
+            remaining.append((team1, next1))
+            i += 2
+
+        elif next1 in ("0", "1", "2") and i + 3 < len(lines):
+            # Kemungkinan ada skor
+            score2_str = lines[i + 2]
+            team2_cand  = lines[i + 3]
+            if score2_str in ("0", "1", "2") and team2_cand in VALID:
+                if int(next1) == 0 and int(score2_str) == 0:
+                    # 0-0 = belum dimainkan / sedang berlangsung
+                    remaining.append((team1, team2_cand))
+                # else: sudah selesai, lewati
+                i += 4
+            else:
+                i += 1
+        else:
+            i += 1
+
+    return remaining
+
+
 # ── Fallback Data (hardcoded berdasarkan data terkini S17) ───────────────────
 
 def _fallback_standings() -> dict:
-    """Data standings MPL ID S17 per Week 6 Day 2."""
+    """Data standings MPL ID S17 per Week 6 Day 3 (setelah NAVI vs TLID selesai)."""
     raw = [
         ("ONIC",  8, 8, 2,   13, 18,  5),
         ("DEWA",  7, 7, 3,    9, 16,  7),
         ("BTR",   6, 6, 4,    0, 13, 13),
+        ("TLID",  6, 6, 5,   -1, 13, 14),
         ("AE",    6, 6, 5,   -1, 15, 16),
         ("EVOS",  5, 5, 5,    1, 12, 11),
-        ("TLID",  5, 5, 5,   -2, 11, 13),
         ("GEEK",  4, 4, 6,   -4, 10, 14),
-        ("NAVI",  3, 3, 7,   -5, 10, 15),
+        ("NAVI",  3, 3, 8,   -6, 11, 17),
         ("RRQ",   1, 1, 8,  -11,  5, 16),
     ]
     result = {}
@@ -233,43 +272,44 @@ def _fallback_standings() -> dict:
 
 def _fallback_remaining_matches() -> list:
     """
-    Jadwal sisa MPL ID S17 yang diketahui (per 3 Mei 2026).
-    Digenerate dari debug DOM extraction pada halaman id-mpl.com/schedule.
-    Dipakai sebagai safety-net jika DOM extraction ada match yang terlewat.
+    Jadwal sisa MPL ID S17 (per Week 6 Day 3, berdasarkan Liquipedia).
+    NAVI vs TLID sudah selesai (1-2), tidak termasuk di sini.
     """
     return [
-        # ─ Week 6 - Day 3 (3 Mei) ─────────────────────
-        ("NAVI",  "TLID"),
+        # ─ Week 6 - Day 3 ────────────────────────────
         ("ONIC",  "RRQ"),
         ("GEEK",  "EVOS"),
-        # ─ Week 7 - Day 1 (8 Mei) ─────────────────────
+        # ─ Week 7 - Day 1 ────────────────────────────
         ("GEEK",  "DEWA"),
         ("BTR",   "TLID"),
-        # ─ Week 7 - Day 2 (9 Mei) ─────────────────────
+        # ─ Week 7 - Day 2 ────────────────────────────
         ("DEWA",  "AE"),
         ("EVOS",  "RRQ"),
         ("ONIC",  "NAVI"),
-        # ─ Week 7 - Day 3 (10 Mei) ────────────────────
-        ("NAVI",  "BTR"),
+        # ─ Week 7 - Day 3 ────────────────────────────
         ("RRQ",   "GEEK"),
+        ("NAVI",  "BTR"),
         ("TLID",  "EVOS"),
-        # ─ Week 8 - Day 1 (15 Mei) ────────────────────
+        # ─ Week 8 - Day 1 ────────────────────────────
+        ("BTR",   "GEEK"),
         ("DEWA",  "ONIC"),
-        # ─ Week 8 - Day 2 (16 Mei) ────────────────────
+        # ─ Week 8 - Day 2 ────────────────────────────
         ("EVOS",  "NAVI"),
+        ("TLID",  "RRQ"),
         ("ONIC",  "AE"),
-        # ─ Week 8 - Day 3 (17 Mei) ────────────────────
-        ("AE",    "BTR"),
+        # ─ Week 8 - Day 3 ────────────────────────────
         ("DEWA",  "EVOS"),
+        ("AE",    "BTR"),
         ("RRQ",   "NAVI"),
-        # ─ Week 9 - Day 1 (22 Mei) ────────────────────
+        # ─ Week 9 - Day 1 ────────────────────────────
         ("BTR",   "DEWA"),
         ("TLID",  "AE"),
-        # ─ Week 9 - Day 2 (23 Mei) ────────────────────
+        # ─ Week 9 - Day 2 ────────────────────────────
+        ("GEEK",  "TLID"),
         ("AE",    "RRQ"),
         ("BTR",   "ONIC"),
-        # ─ Week 9 - Day 3 (24 Mei) ────────────────────
-        ("NAVI",  "GEEK"),
-        ("ONIC",  "EVOS"),
+        # ─ Week 9 - Day 3 ────────────────────────────
         ("RRQ",   "DEWA"),
+        ("ONIC",  "EVOS"),
+        ("NAVI",  "GEEK"),
     ]
