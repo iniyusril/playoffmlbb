@@ -8,8 +8,8 @@
   <style>
     /* ── Custom scrollbar ── */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: #0d1117; }
-    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+    ::-webkit-scrollbar-track { background: #f6f8fa; }
+    ::-webkit-scrollbar-thumb { background: #d0d7de; border-radius: 3px; }
 
     /* ── Gradient probability bar ── */
     .prob-bar-inner {
@@ -34,10 +34,10 @@
     }
   </style>
 </head>
-<body class="bg-[#0d1117] text-gray-100 min-h-screen font-sans antialiased">
+<body class="bg-[#f6f8fa] text-gray-800 min-h-screen font-sans antialiased">
 
   <!-- ══ HEADER ══════════════════════════════════════════════════════════════ -->
-  <header class="bg-[#161b22] border-b border-[#30363d] shadow-lg">
+  <header class="bg-white border-b border-[#d0d7de] shadow-sm">
     <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
       <div class="flex items-center gap-3">
         <img
@@ -47,21 +47,21 @@
           onerror="this.style.display='none'"
         />
         <div>
-          <h1 class="text-xl font-bold text-white leading-tight">Peluang Playoff</h1>
-          <p class="text-xs text-gray-400">MPL Indonesia Season 17 · Regular Season</p>
+          <h1 class="text-xl font-bold text-gray-900 leading-tight">Peluang Playoff</h1>
+          <p class="text-xs text-gray-500">MPL Indonesia Season 17 · Regular Season</p>
         </div>
       </div>
       <div class="flex items-center gap-3">
         <!-- Last updated -->
         <div class="text-right hidden sm:block">
           <p class="text-xs text-gray-500">Terakhir diperbarui</p>
-          <p id="lastUpdated" class="text-xs text-gray-300 font-mono">—</p>
+          <p id="lastUpdated" class="text-xs text-gray-700 font-mono">—</p>
         </div>
         <!-- Refresh button -->
         <button
           id="refreshBtn"
           onclick="forceRefresh()"
-          class="flex items-center gap-1.5 bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-gray-300 text-sm px-3 py-1.5 rounded-lg transition"
+          class="flex items-center gap-1.5 bg-[#f6f8fa] hover:bg-[#eaeef2] border border-[#d0d7de] text-gray-600 text-sm px-3 py-1.5 rounded-lg transition"
           title="Paksa refresh data"
         >
           <svg id="refreshIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -83,11 +83,11 @@
       </div>
       <div class="flex items-center gap-1.5">
         <span class="inline-block w-2 h-2 rounded-full bg-green-400"></span>
-        <span class="bg-green-900/40 text-green-300 border border-green-700 text-[10px] px-1.5 py-0.5 rounded-full font-semibold">PASTI LOLOS</span>
+        <span class="bg-green-100 text-green-700 border border-green-300 text-[10px] px-1.5 py-0.5 rounded-full font-semibold">PASTI LOLOS</span>
         Secara matematis sudah pasti lolos
       </div>
       <div class="flex items-center gap-1.5">
-        <span class="bg-red-900/40 text-red-300 border border-red-700 text-[10px] px-1.5 py-0.5 rounded-full font-semibold">ELIMINASI</span>
+        <span class="bg-red-100 text-red-600 border border-red-300 text-[10px] px-1.5 py-0.5 rounded-full font-semibold">ELIMINASI</span>
         Secara matematis sudah tidak bisa lolos
       </div>
     </div>
@@ -119,17 +119,17 @@
     <div id="dataContent" class="hidden space-y-6">
 
       <!-- ── Standings Table ─────────────────────────────────────────────── -->
-      <section class="bg-[#161b22] border border-[#30363d] rounded-xl overflow-hidden">
-        <div class="px-5 py-3 border-b border-[#30363d] flex items-center justify-between">
-          <h2 class="font-semibold text-gray-100">Klasemen Regular Season</h2>
-          <span id="remainingBadge" class="text-xs bg-blue-900/50 text-blue-300 border border-blue-800 px-2 py-0.5 rounded-full"></span>
+      <section class="bg-white border border-[#d0d7de] rounded-xl overflow-hidden">
+        <div class="px-5 py-3 border-b border-[#d0d7de] flex items-center justify-between">
+          <h2 class="font-semibold text-gray-900">Klasemen Regular Season</h2>
+          <span id="remainingBadge" class="text-xs bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded-full"></span>
         </div>
 
         <!-- Desktop table -->
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
-              <tr class="text-[11px] text-gray-500 uppercase tracking-wider border-b border-[#30363d]">
+              <tr class="text-[11px] text-gray-500 uppercase tracking-wider border-b border-[#d0d7de]">
                 <th class="px-4 py-2.5 text-left w-8">#</th>
                 <th class="px-4 py-2.5 text-left">Tim</th>
                 <th class="px-4 py-2.5 text-center">MP</th>
@@ -150,20 +150,20 @@
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         <!-- Remaining Matches -->
-        <section class="bg-[#161b22] border border-[#30363d] rounded-xl overflow-hidden">
-          <div class="px-5 py-3 border-b border-[#30363d]">
-            <h2 class="font-semibold text-gray-100">Pertandingan Tersisa</h2>
+        <section class="bg-white border border-[#d0d7de] rounded-xl overflow-hidden">
+          <div class="px-5 py-3 border-b border-[#d0d7de]">
+            <h2 class="font-semibold text-gray-900">Pertandingan Tersisa</h2>
             <p class="text-xs text-gray-500 mt-0.5">Semua match yang belum dimainkan</p>
           </div>
-          <ul id="matchList" class="divide-y divide-[#21262d] max-h-96 overflow-y-auto">
+          <ul id="matchList" class="divide-y divide-[#eaeef2] max-h-96 overflow-y-auto">
             <!-- Diisi oleh JavaScript -->
           </ul>
         </section>
 
         <!-- Status Summary -->
-        <section class="bg-[#161b22] border border-[#30363d] rounded-xl overflow-hidden">
-          <div class="px-5 py-3 border-b border-[#30363d]">
-            <h2 class="font-semibold text-gray-100">Ringkasan Status</h2>
+        <section class="bg-white border border-[#d0d7de] rounded-xl overflow-hidden">
+          <div class="px-5 py-3 border-b border-[#d0d7de]">
+            <h2 class="font-semibold text-gray-900">Ringkasan Status</h2>
             <p class="text-xs text-gray-500 mt-0.5">Berdasarkan simulasi Monte Carlo 10.000 iterasi</p>
           </div>
           <div id="statusCards" class="p-4 space-y-2">
@@ -247,42 +247,42 @@
       standings.forEach((team, idx) => {
         const isPlayoffLine = (idx === 5 && standings.length > 6); // setelah rank 6
         const tr = document.createElement('tr');
-        tr.className = 'border-b border-[#21262d] hover:bg-[#1c2128] transition row-animate';
-        if (idx < 6) tr.classList.add('bg-green-950/10');
+        tr.className = 'border-b border-[#eaeef2] hover:bg-[#f6f8fa] transition row-animate';
+        if (idx < 6) tr.classList.add('bg-green-50/50');
 
         const prob         = team.playoff_prob;
         const barColor     = probColor(prob);
         const statusBadge  = badgeHtml(team.status);
         const rankIndicator = idx < 6
           ? `<span class="inline-block w-2 h-2 rounded-full bg-green-500 mr-1"></span>`
-          : `<span class="inline-block w-2 h-2 rounded-full bg-gray-700 mr-1"></span>`;
+          : `<span class="inline-block w-2 h-2 rounded-full bg-gray-400 mr-1"></span>`;
 
         tr.innerHTML = `
-          <td class="px-4 py-3 text-gray-400 w-8 font-mono text-xs">${rankIndicator}${team.rank}</td>
+          <td class="px-4 py-3 text-gray-500 w-8 font-mono text-xs">${rankIndicator}${team.rank}</td>
           <td class="px-4 py-3">
             <div class="flex items-center gap-2.5">
               ${logoHtml(team)}
               <div>
-                <div class="font-semibold text-gray-100 text-sm">${team.name}</div>
+                <div class="font-semibold text-gray-800 text-sm">${team.name}</div>
                 ${statusBadge}
               </div>
             </div>
           </td>
-          <td class="px-4 py-3 text-center font-bold text-white">${team.match_points}</td>
+          <td class="px-4 py-3 text-center font-bold text-gray-900">${team.match_points}</td>
           <td class="px-4 py-3 text-center">
-            <span class="text-green-400">${team.wins}</span>
-            <span class="text-gray-600">/</span>
-            <span class="text-red-400">${team.losses}</span>
+            <span class="text-green-600">${team.wins}</span>
+            <span class="text-gray-400">/</span>
+            <span class="text-red-500">${team.losses}</span>
           </td>
-          <td class="px-4 py-3 text-center hidden sm:table-cell ${team.net_game_win >= 0 ? 'text-green-400' : 'text-red-400'}">
+          <td class="px-4 py-3 text-center hidden sm:table-cell ${team.net_game_win >= 0 ? 'text-green-600' : 'text-red-500'}">
             ${team.net_game_win > 0 ? '+' : ''}${team.net_game_win}
           </td>
-          <td class="px-4 py-3 text-center hidden md:table-cell text-gray-400">
+          <td class="px-4 py-3 text-center hidden md:table-cell text-gray-500">
             ${team.game_wins}-${team.game_losses}
           </td>
           <td class="px-4 py-3 pl-6 min-w-[180px]">
             <div class="flex items-center gap-2">
-              <div class="flex-1 bg-[#21262d] rounded-full h-2.5 overflow-hidden">
+              <div class="flex-1 bg-gray-200 rounded-full h-2.5 overflow-hidden">
                 <div class="prob-bar-inner h-2.5 rounded-full ${barColor}" style="width: ${prob}%"></div>
               </div>
               <span class="text-xs font-mono w-12 text-right ${probTextColor(prob)}">${prob.toFixed(1)}%</span>
@@ -319,15 +319,15 @@
       }
 
       ul.innerHTML = matches.map(([t1, t2], i) => `
-        <li class="flex items-center justify-between px-5 py-2.5 hover:bg-[#1c2128] transition">
+        <li class="flex items-center justify-between px-5 py-2.5 hover:bg-[#f6f8fa] transition">
           <div class="flex items-center gap-2 flex-1 justify-end">
-            <span class="font-semibold text-sm text-gray-200">${t1}</span>
+            <span class="font-semibold text-sm text-gray-700">${t1}</span>
             <div class="w-5 h-5 rounded-full flex-shrink-0" style="background:${TEAM_COLORS[t1]||'#555'}"></div>
           </div>
           <span class="mx-3 text-[11px] font-bold text-gray-500 w-6 text-center">VS</span>
           <div class="flex items-center gap-2 flex-1">
             <div class="w-5 h-5 rounded-full flex-shrink-0" style="background:${TEAM_COLORS[t2]||'#555'}"></div>
-            <span class="font-semibold text-sm text-gray-200">${t2}</span>
+            <span class="font-semibold text-sm text-gray-700">${t2}</span>
           </div>
         </li>`
       ).join('');
@@ -340,9 +340,9 @@
         const prob = team.playoff_prob;
         const bar  = probColor(prob);
         const statusLabel = {
-          PASTI_LOLOS: '<span class="text-green-300 font-bold">✓ Pasti Lolos</span>',
-          ELIMINASI:   '<span class="text-red-400 font-bold">✗ Eliminasi</span>',
-          BERSAING:    `<span class="text-yellow-300 font-bold">${prob.toFixed(1)}% peluang</span>`,
+          PASTI_LOLOS: '<span class="text-green-600 font-bold">✓ Pasti Lolos</span>',
+          ELIMINASI:   '<span class="text-red-500 font-bold">✗ Eliminasi</span>',
+          BERSAING:    `<span class="text-yellow-600 font-bold">${prob.toFixed(1)}% peluang</span>`,
         }[team.status] || '';
 
         const rankRange = team.best_rank === team.worst_rank
@@ -354,14 +354,14 @@
             ${logoHtml(team, 24)}
             <div class="flex-1 min-w-0">
               <div class="flex items-center justify-between gap-2">
-                <span class="text-sm font-semibold text-gray-200">${team.name}</span>
+                <span class="text-sm font-semibold text-gray-800">${team.name}</span>
                 <span class="text-xs text-right">${statusLabel}</span>
               </div>
               <div class="flex items-center gap-2 mt-1">
-                <div class="flex-1 bg-[#21262d] rounded-full h-1.5">
+                <div class="flex-1 bg-gray-200 rounded-full h-1.5">
                   <div class="h-1.5 rounded-full ${bar}" style="width:${prob}%"></div>
                 </div>
-                <span class="text-[10px] text-gray-600 whitespace-nowrap">${rankRange}</span>
+                <span class="text-[10px] text-gray-500 whitespace-nowrap">${rankRange}</span>
               </div>
             </div>
           </div>`;
@@ -396,10 +396,10 @@
 
     function badgeHtml(status) {
       if (status === 'PASTI_LOLOS') {
-        return `<span class="text-[9px] font-bold bg-green-900/50 text-green-300 border border-green-700/60 px-1.5 py-0.5 rounded-full">PASTI LOLOS</span>`;
+        return `<span class="text-[9px] font-bold bg-green-100 text-green-700 border border-green-300 px-1.5 py-0.5 rounded-full">PASTI LOLOS</span>`;
       }
       if (status === 'ELIMINASI') {
-        return `<span class="text-[9px] font-bold bg-red-900/50 text-red-300 border border-red-700/60 px-1.5 py-0.5 rounded-full">ELIMINASI</span>`;
+        return `<span class="text-[9px] font-bold bg-red-100 text-red-600 border border-red-300 px-1.5 py-0.5 rounded-full">ELIMINASI</span>`;
       }
       return '';
     }
@@ -412,10 +412,10 @@
     }
 
     function probTextColor(prob) {
-      if (prob >= 75) return 'text-green-400';
-      if (prob >= 45) return 'text-yellow-400';
-      if (prob >= 15) return 'text-orange-400';
-      return 'text-red-400';
+      if (prob >= 75) return 'text-green-600';
+      if (prob >= 45) return 'text-yellow-600';
+      if (prob >= 15) return 'text-orange-500';
+      return 'text-red-500';
     }
 
     function setLoading(val) {
