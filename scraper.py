@@ -36,7 +36,7 @@ TEAM_LOGOS = {
     "EVOS": "https://wsrv.nl/?url=https://ik.imagekit.io/nloe8dhf7w/mplid/s14/teams/evos-64.png",
     "TLID": "https://wsrv.nl/?url=https://ik.imagekit.io/nloe8dhf7w/mplid/s14/teams/tlid-64.png",
     "GEEK": "https://wsrv.nl/?url=https://ik.imagekit.io/nloe8dhf7w/mplid/s14/teams/geek-64.png",
-    "NAVI": "https://wsrv.nl/?url=https://ik.imagekit.io/nloe8dhf7w/mplid/s14/teams/navi-64.png",
+    "NAVI": "https://cdn.id-mpl.com/season15/NAVI-2.png?X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=DO00UK9XG63MGT2KWV9H%2F20260506%2Fsgp1%2Fs3%2Faws4_request&X-Amz-Date=20260506T010653Z&X-Amz-SignedHeaders=host&X-Amz-Expires=21600&X-Amz-Signature=3de94c626e5862dd29f523b2094a205a8037b2ce8b65829e2abf8e9e1a1d4d94",
     "RRQ":  "https://wsrv.nl/?url=https://ik.imagekit.io/nloe8dhf7w/mplid/s14/teams/rrq-64.png",
 }
 
