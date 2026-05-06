@@ -29,7 +29,7 @@ TEAM_NAME_MAP = {
 }
 
 TEAM_LOGOS = {
-    "ONIC": "https://wsrv.nl/?url=https://ik.imagekit.io/nloe8dhf7w/mplid/s14/teams/onic-64.png",
+    "ONIC": "https://cdn.id-mpl.com/data/teams/onic-b-64.png?X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=DO00UK9XG63MGT2KWV9H%2F20260506%2Fsgp1%2Fs3%2Faws4_request&X-Amz-Date=20260506T010653Z&X-Amz-SignedHeaders=host&X-Amz-Expires=21600&X-Amz-Signature=6970805dc67cc9287195c172f431d6349bb4e3b8a380b2506ee6c0fa59ae0f45",
     "DEWA": "https://wsrv.nl/?url=https://ik.imagekit.io/nloe8dhf7w/mplid/s14/teams/dewa-64.png",
     "BTR":  "https://wsrv.nl/?url=https://ik.imagekit.io/nloe8dhf7w/mplid/s14/teams/btr-64.png",
     "AE":   "https://wsrv.nl/?url=https://ik.imagekit.io/nloe8dhf7w/mplid/s14/teams/ae-64.png",
