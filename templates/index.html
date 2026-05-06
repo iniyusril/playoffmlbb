@@ -247,7 +247,7 @@
       standings.forEach((team, idx) => {
         const isPlayoffLine = (idx === 5 && standings.length > 6); // setelah rank 6
         const tr = document.createElement('tr');
-        tr.className = 'border-b border-[#eaeef2] hover:bg-[#f6f8fa] transition row-animate';
+        tr.className = 'border-b border-[#eaeef2] hover:bg-[#eaeef2] transition row-animate';
         if (idx < 6) tr.classList.add('bg-green-50/50');
 
         const prob         = team.playoff_prob;
@@ -319,7 +319,7 @@
       }
 
       ul.innerHTML = matches.map(([t1, t2], i) => `
-        <li class="flex items-center justify-between px-5 py-2.5 hover:bg-[#f6f8fa] transition">
+        <li class="flex items-center justify-between px-5 py-2.5 hover:bg-[#eaeef2] transition">
           <div class="flex items-center gap-2 flex-1 justify-end">
             <span class="font-semibold text-sm text-gray-700">${t1}</span>
             <div class="w-5 h-5 rounded-full flex-shrink-0" style="background:${TEAM_COLORS[t1]||'#555'}"></div>
