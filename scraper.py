@@ -5,6 +5,7 @@ Mengambil standings dan jadwal pertandingan yang belum dimainkan.
 
 import re
 import logging
+from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 
 logger = logging.getLogger(__name__)
@@ -77,14 +78,21 @@ async def scrape_data() -> dict:
         # Tunggu konten dinamis ter-render
         await page.wait_for_timeout(4_000)
 
+        html: str = await page.content()
+        soup = BeautifulSoup(html, "html.parser")
         text: str = await page.evaluate("() => document.body.innerText")
-        logger.info("Liquipedia page fetched, panjang text: %d", len(text))
+        logger.info(
+            "Liquipedia page fetched, html len: %d, text len: %d",
+            len(html),
+            len(text),
+        )
 
         await browser.close()
 
-    standings = parse_standings(text)
+    standings = parse_standings(soup)
     logger.info("Standings ditemukan: %s", list(standings.keys()))
 
+    # remaining matches parser still uses innerText (text) for now
     remaining = parse_remaining_matches(text)
     logger.info("Remaining matches: %d pertandingan", len(remaining))
 
@@ -107,12 +115,119 @@ async def scrape_data() -> dict:
 
 # ── Parser Standings ──────────────────────────────────────────────────────────
 
-def parse_standings(text: str) -> dict:
+def parse_standings(soup_or_text) -> dict:
     """
-    Parse standings dari Liquipedia innerText.
-    Format baris: N.  TEAM_NAME  W-L  GW-GL  +/-DIFF
-    TEAM_NAME bisa berisi spasi (misal: "Dewa United Esports").
+    Parse standings. Accepts either a BeautifulSoup `soup` (preferred) or
+    the raw `text` fallback (older implementation).
     """
+    # If caller passed a BeautifulSoup object, use DOM parsing
+    if not isinstance(soup_or_text, str):
+        soup = soup_or_text
+        standings: dict = {}
+
+        # Find the main standings table: look for a wikitable with headers
+        tables = soup.find_all("table", class_=lambda c: c and "wikitable" in c)
+        standings_table = None
+        for table in tables:
+            headers = [th.get_text(strip=True).lower() for th in table.find_all("th")]
+            if any("match" in h for h in headers) and any("team" in h for h in headers):
+                standings_table = table
+                break
+
+        if standings_table is None:
+            logger.warning("Standings table not found via DOM, falling back to text parser")
+            return parse_standings(str(soup.get_text()))
+
+        trs = standings_table.find_all("tr")
+        # collect toggle-area-content values (weeks/current) and pick the highest one
+        toggles = []
+        for tr in trs:
+            if tr.has_attr("data-toggle-area-content"):
+                try:
+                    toggles.append(int(tr["data-toggle-area-content"]))
+                except Exception:
+                    pass
+
+        if toggles:
+            max_toggle = max(toggles)
+            target_rows = [tr for tr in trs if tr.get("data-toggle-area-content") and int(tr["data-toggle-area-content"]) == max_toggle]
+        else:
+            target_rows = [tr for tr in trs if tr.find_all("td")]
+
+        for tr in target_rows:
+            tds = tr.find_all("td")
+            if not tds:
+                continue
+
+            # Team name usually in first td -> anchor text
+            team_cell = tds[0]
+            a = team_cell.find("a")
+            raw_name = a.get_text(strip=True) if a else team_cell.get_text(strip=True)
+
+            # Map to team code using existing tolerant logic
+            team_code = TEAM_NAME_MAP.get(raw_name)
+            if not team_code:
+                cleaned = re.sub(r"\s*\(.*?\)\s*", "", raw_name).strip()
+                team_code = TEAM_NAME_MAP.get(cleaned)
+
+            if not team_code:
+                low = raw_name.lower()
+                for k, v in TEAM_NAME_MAP.items():
+                    if k.lower() == low or k.lower() in low or low in k.lower():
+                        team_code = v
+                        logger.debug("Matched team name '%s' -> '%s' via fuzzy rule", raw_name, k)
+                        break
+
+            if not team_code:
+                logger.warning("Tim '%s' tidak dikenali saat parsing standings.", raw_name)
+                continue
+
+            # Parse columns: match (W-L), game (GW-GL), diff
+            wins = losses = game_wins = game_losses = net_game_win = 0
+            if len(tds) >= 2:
+                match_text = tds[1].get_text(" ", strip=True)
+                m = re.search(r"(\d+)\s*-\s*(\d+)", match_text)
+                if m:
+                    wins = int(m.group(1))
+                    losses = int(m.group(2))
+
+            if len(tds) >= 3:
+                game_text = tds[2].get_text(" ", strip=True)
+                m = re.search(r"(\d+)\s*-\s*(\d+)", game_text)
+                if m:
+                    game_wins = int(m.group(1))
+                    game_losses = int(m.group(2))
+
+            if len(tds) >= 4:
+                diff_text = tds[3].get_text(strip=True).replace("+", "")
+                try:
+                    net_game_win = int(diff_text)
+                except Exception:
+                    net_game_win = 0
+
+            standings[team_code] = {
+                "name":         team_code,
+                "match_points": wins,
+                "wins":         wins,
+                "losses":       losses,
+                "net_game_win": net_game_win,
+                "game_wins":    game_wins,
+                "game_losses":  game_losses,
+                "logo":         TEAM_LOGOS.get(team_code, ""),
+                "color":        TEAM_COLORS.get(team_code, "#888"),
+            }
+
+        # Fallback: isi tim yang tidak ditemukan dengan data hardcoded
+        fallback = _fallback_standings()
+        for team in fallback:
+            if team not in standings:
+                logger.warning("Tim %s tidak ditemukan di scrape, menggunakan fallback.", team)
+                standings[team] = fallback[team]
+
+        return standings
+
+    # Otherwise assume a text string and run the original regex-based parser
+    text: str = soup_or_text
     standings: dict = {}
 
     # Cari batas section standings (antara "Regular Season[edit]" dan H2H/tiebreaker)
@@ -132,6 +247,13 @@ def parse_standings(text: str) -> dict:
 
     section = text[start:end]
 
+    # Hapus marker perubahan peringkat seperti '▲1' / '▼3' (bisa muncul di baris sendiri
+    # atau terpasang pada nama tim). Juga gabungkan baris di mana skor berada di baris
+    # terpisah sehingga pola regex dapat menemukan semuanya pada satu baris.
+    section = re.sub(r'^\s*[▲▼]\s*\d+\s*$', '', section, flags=re.MULTILINE)
+    section = re.sub(r'[▲▼]\s*\d+', '', section)
+    section = re.sub(r"\n\s*(\d+-\d+\s+\d+-\d+\s+[+-]?\d+)", r" \1", section)
+
     # Pattern: "N.  TEAM_NAME  W-L  GW-GL  +/-DIFF"
     pattern = re.compile(
         r"\d+\.\s+(.+?)\s+(\d+)-(\d+)\s+(\d+)-(\d+)\s+([+-]?\d+)",
@@ -140,8 +262,30 @@ def parse_standings(text: str) -> dict:
 
     for m in pattern.finditer(section):
         raw_name = re.sub(r"\s+", " ", m.group(1)).strip()
+
+        # Try direct lookup first, then several tolerant fallbacks:
+        # 1) remove parenthetical suffixes (e.g. "Alter Ego (ID)")
+        # 2) case-insensitive exact or substring match against keys in TEAM_NAME_MAP
         team_code = TEAM_NAME_MAP.get(raw_name)
+
+        if not team_code:
+            # remove any trailing parenthesis content
+            cleaned = re.sub(r"\s*\(.*?\)\s*", "", raw_name).strip()
+            team_code = TEAM_NAME_MAP.get(cleaned)
+
+        if not team_code:
+            # case-insensitive match or substring match
+            low = raw_name.lower()
+            for k, v in TEAM_NAME_MAP.items():
+                if k.lower() == low or k.lower() in low or low in k.lower():
+                    team_code = v
+                    logger.debug("Matched team name '%s' -> '%s' via fuzzy rule", raw_name, k)
+                    break
+
         if not team_code or team_code in standings:
+            # skip unknown or duplicate entries; fallback later will fill missing teams
+            if not team_code:
+                logger.warning("Tim '%s' tidak dikenali saat parsing standings.", raw_name)
             continue
 
         standings[team_code] = {

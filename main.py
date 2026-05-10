@@ -3,6 +3,14 @@ FastAPI server – MPL ID S17 Playoff Probability Tracker
 """
 
 import asyncio
+import sys
+
+# Ensure subprocess support on Windows for Playwright
+if sys.platform == "win32":
+    try:
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    except Exception:
+        pass
 import logging
 import time
 from pathlib import Path
