@@ -30,14 +30,14 @@ TEAM_NAME_MAP = {
 }
 
 TEAM_LOGOS = {
-    "ONIC": "https://cdn.id-mpl.com/data/teams/onic-b-64.png?X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=DO00UK9XG63MGT2KWV9H%2F20260506%2Fsgp1%2Fs3%2Faws4_request&X-Amz-Date=20260506T010653Z&X-Amz-SignedHeaders=host&X-Amz-Expires=21600&X-Amz-Signature=6970805dc67cc9287195c172f431d6349bb4e3b8a380b2506ee6c0fa59ae0f45",
+    "ONIC": "https://upload.wikimedia.org/wikipedia/en/f/f1/Logo_of_ONIC_Esports.png",
     "DEWA": "https://wsrv.nl/?url=https://ik.imagekit.io/nloe8dhf7w/mplid/s14/teams/dewa-64.png",
     "BTR":  "https://wsrv.nl/?url=https://ik.imagekit.io/nloe8dhf7w/mplid/s14/teams/btr-64.png",
     "AE":   "https://wsrv.nl/?url=https://ik.imagekit.io/nloe8dhf7w/mplid/s14/teams/ae-64.png",
     "EVOS": "https://wsrv.nl/?url=https://ik.imagekit.io/nloe8dhf7w/mplid/s14/teams/evos-64.png",
     "TLID": "https://wsrv.nl/?url=https://ik.imagekit.io/nloe8dhf7w/mplid/s14/teams/tlid-64.png",
     "GEEK": "https://wsrv.nl/?url=https://ik.imagekit.io/nloe8dhf7w/mplid/s14/teams/geek-64.png",
-    "NAVI": "https://cdn.id-mpl.com/season15/NAVI-2.png?X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=DO00UK9XG63MGT2KWV9H%2F20260506%2Fsgp1%2Fs3%2Faws4_request&X-Amz-Date=20260506T010653Z&X-Amz-SignedHeaders=host&X-Amz-Expires=21600&X-Amz-Signature=3de94c626e5862dd29f523b2094a205a8037b2ce8b65829e2abf8e9e1a1d4d94",
+    "NAVI": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/NAVI-Logo.svg/960px-NAVI-Logo.svg.png",
     "RRQ":  "https://wsrv.nl/?url=https://ik.imagekit.io/nloe8dhf7w/mplid/s14/teams/rrq-64.png",
 }
 
@@ -159,10 +159,18 @@ def parse_standings(soup_or_text) -> dict:
             if not tds:
                 continue
 
-            # Team name usually in first td -> anchor text
+            # Team name now in span.team-template-text > a (new HTML structure)
             team_cell = tds[0]
-            a = team_cell.find("a")
-            raw_name = a.get_text(strip=True) if a else team_cell.get_text(strip=True)
+            team_span = team_cell.find("span", class_="team-template-text")
+            
+            if team_span:
+                # New structure: span > a
+                a = team_span.find("a")
+                raw_name = a.get_text(strip=True) if a else team_span.get_text(strip=True)
+            else:
+                # Fallback to old structure: direct a in td
+                a = team_cell.find("a")
+                raw_name = a.get_text(strip=True) if a else team_cell.get_text(strip=True)
 
             # Map to team code using existing tolerant logic
             team_code = TEAM_NAME_MAP.get(raw_name)
@@ -386,17 +394,17 @@ def parse_remaining_matches(text: str) -> list:
 # ── Fallback Data (hardcoded berdasarkan data terkini S17) ───────────────────
 
 def _fallback_standings() -> dict:
-    """Data standings MPL ID S17 per Week 6 Day 3 (setelah NAVI vs TLID selesai)."""
+    """Data standings MPL ID S17 - Current (Updated per Liquipedia)."""
     raw = [
-        ("ONIC",  8, 8, 2,   13, 18,  5),
-        ("DEWA",  7, 7, 3,    9, 16,  7),
-        ("BTR",   6, 6, 4,    0, 13, 13),
-        ("TLID",  6, 6, 5,   -1, 13, 14),
-        ("AE",    6, 6, 5,   -1, 15, 16),
-        ("EVOS",  5, 5, 5,    1, 12, 11),
-        ("GEEK",  4, 4, 6,   -4, 10, 14),
-        ("NAVI",  3, 3, 8,   -6, 11, 17),
-        ("RRQ",   1, 1, 8,  -11,  5, 16),
+        ("ONIC",  10, 10, 2,  +17, 22,  5),
+        ("DEWA",   8,  8, 4,   +9, 19, 10),
+        ("TLID",   7,  7, 5,   +1, 15, 14),
+        ("AE",     7,  7, 5,    0, 17, 17),
+        ("EVOS",   6,  6, 6,   +1, 14, 13),
+        ("BTR",    6,  6, 5,   -2, 13, 15),
+        ("GEEK",   5,  5, 7,   -3, 13, 16),
+        ("NAVI",   3,  3, 9,   -8, 11, 19),
+        ("RRQ",    1,  1, 10, -15,  5, 20),
     ]
     result = {}
     for team, mp, w, l, ngw, gw, gl in raw:
@@ -416,21 +424,11 @@ def _fallback_standings() -> dict:
 
 def _fallback_remaining_matches() -> list:
     """
-    Jadwal sisa MPL ID S17 (per Week 6 Day 3, berdasarkan Liquipedia).
-    NAVI vs TLID sudah selesai (1-2), tidak termasuk di sini.
+    Jadwal sisa MPL ID S17 (Updated per Liquipedia - Week 7 Day 2 sudah selesai).
+    Week 7 Day 1-2 sudah dimainkan, sisa dari Day 3 Week 7 hingga Week 9.
     """
     return [
-        # ─ Week 6 - Day 3 ────────────────────────────
-        ("ONIC",  "RRQ"),
-        ("GEEK",  "EVOS"),
-        # ─ Week 7 - Day 1 ────────────────────────────
-        ("GEEK",  "DEWA"),
-        ("BTR",   "TLID"),
-        # ─ Week 7 - Day 2 ────────────────────────────
-        ("DEWA",  "AE"),
-        ("EVOS",  "RRQ"),
-        ("ONIC",  "NAVI"),
-        # ─ Week 7 - Day 3 ────────────────────────────
+        # ─ Week 7 - Day 3 (Upcoming) ──────────────
         ("RRQ",   "GEEK"),
         ("NAVI",  "BTR"),
         ("TLID",  "EVOS"),
